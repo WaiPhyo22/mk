@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Firestore Security Rules - Kaung Myat Ko Ko & Khaing Su Su Zaw wedding site
+//
+// Public visitors (no login) may ONLY:
+//   - create a new wish that passes strict validation (always approved == false)
+//   - read wishes the couple has approved
+// Nobody can update or delete through the public site. The couple moderates
+// in the Firebase Console, which uses admin privileges and bypasses these rules.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidWish(data) {
+      return data.keys().hasOnly(['name', 'message', 'createdAt', 'approved'])
+        && data.keys().hasAll(['name', 'message', 'createdAt', 'approved'])
+        && data.name is string
+        && data.name.trim().size() >= 1
+        && data.name.size() <= 60
+        && data.message is string
+        && data.message.trim().size() >= 2
+        && data.message.size() <= 500
+        && data.createdAt == request.time      // must be serverTimestamp()
+        && data.approved == false;             // guests can never self-approve
+    }
+
+    match /wedding_wishes/{wishId} {
+      // Queries must include where('approved', '==', true), otherwise denied.
+      allow get, list: if resource.data.approved == true;
+      allow create: if isValidWish(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // RSVP (disabled by default). To enable, uncomment this block, deploy
+    // the rules, and set FEATURES.rsvp.saveToFirestore = true in js/config.js.
+    // Guests can create responses but NOBODY can read them from the site -
+    // the couple reads them in the Firebase Console.
+    // ---------------------------------------------------------------
+    // match /rsvp_responses/{rsvpId} {
+    //   allow create: if request.resource.data.keys().hasOnly(['name', 'attending', 'guests', 'createdAt'])
+    //     && request.resource.data.keys().hasAll(['name', 'attending', 'guests', 'createdAt'])
+    //     && request.resource.data.name is string
+    //     && request.resource.data.name.trim().size() >= 1
+    //     && request.resource.data.name.size() <= 60
+    //     && request.resource.data.attending is bool
+    //     && request.resource.data.guests is int
+    //     && request.resource.data.guests >= 0
+    //     && request.resource.data.guests <= 10
+    //     && (request.resource.data.attending == true || request.resource.data.guests == 0)
+    //     && request.resource.data.createdAt == request.time;
+    //   allow read, update, delete: if false;
+    // }
+
+    // Deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

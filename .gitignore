@@ -1,0 +1,10 @@
+.vercel
+.firebase
+node_modules
+.DS_Store
+Thumbs.db
+*.log
+
+# Local notes and screenshots (not part of the website)
+prompt.md
+/*.png
